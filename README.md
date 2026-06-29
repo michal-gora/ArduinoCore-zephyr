@@ -46,6 +46,95 @@ To get started with your board:
 > [!NOTE]  
 > After the initial setup, future sketches will be loaded automatically without needing to reset the board.
 
+## ✅ Working features (KIT_PSE84_AI)
+
+### Pinout
+
+![Pinout](doc/temporaryPinout.PNG)
+TODO fix image
+
+### GPIO
+
+#### Macros
+
+For the exact macro definitions, refer to `variants/kit_pse84_ai_pse846gps2dbzc4a_m33/variant.h`.
+Here is a general explanation:
+
+- Every exposed GPIO pin from the pinout has a macro identical to the documentation name, e.g. `P17_3`, `P16_0`, `P15_3`, etc.
+- Digital pins have a macro in the format `Dx`, where `x` is the index of the arduino pin in the range [0, 47], e.g. `D0`, `D15`, `D47`, etc.
+- Analog pins have a macro in the format `Ax`, where `x` is the index of the arduino pin in the range [0, 15], e.g. `A0`, `A1`, `A15`, etc.
+- Onboard LED pin name macros are:
+  - `LED_BUILTIN`: `P10_7`
+  - `LED_BUILTIN_1`: `P10_7`
+  - `LED_BUILTIN_2`: `P10_5`
+  - `LED_BUILTIN_ACTIVE`: `HIGH`
+  - `LED_RED`: `P20_6`
+  - `LED_GREEN`: `P20_4`
+  - `LED_BLUE`: `P20_5`
+  - `BTN_BUILTIN`: `P7_0` (`SW1`)
+  - TODO possibly adjust/correct (especially onboard LEDX naming convention, or e.g. SW1)
+- I2C pins are defined as `SDA`/`SCL` and `SDA1`/`SCL1` for the internal (`Wire`), and external (`Wire1`) I2C bus respectively.
+- Expansion header pins include the macros as printed on the board: `SERIAL_INTx` where `x` is the index in the range [0, 3], e.g. `SERIAL_INT0`.
+
+#### Tested Pins
+
+TODO sweep all external GPIO pins
+
+```
+Onboard LEDs:
+P10_7
+P10_5
+P20_6
+P20_4
+P20_5
+
+
+Onboard Buttons:
+
+P7_0
+```
+
+#### Tested functions
+
+```cpp
+digitalWrite()
+digitalRead()
+pinMode()
+```
+
+#### Important, untested functions
+
+```cpp
+analogWrite()
+analogRead()
+```
+
+### I2C
+
+There are two I2C busses.
+`Wire` refers to the internal bus (1V8), which is connected to the following onboard sensors:
+
+- IMU
+- magnet
+- pressure
+- temperature
+- TODO properly fill list
+
+`Wire1` refers to the external bus (3V3) on pins `P17_1` (`SDA1`) and `P17_0` (`SCL1`).
+
+#### Tested functions
+
+#### Important, untested functions
+
+
+### Supported Onboard Sensors and Peripherals
+
+#### Tested sensors/peripherals
+
+#### Untested sensors/peripherals
+
+#### Planned support
+
 ## 🔧 Troubleshooting
 
 ### Common Issues
