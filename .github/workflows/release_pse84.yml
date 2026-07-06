@@ -2,8 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # PSE84-specific release workflow: triggered automatically when package_core.yml
-# completes successfully on main. Bumps the version, tags the commit, and
-# publishes the ArduinoCore-zephyr_contrib package as a GitHub Release.
+# completes successfully on any branch. On main it bumps the version, tags the
+# commit, and publishes a stable GitHub Release. On all other branches it
+# publishes a pre-release tagged dev-<branch-slug> (overwritten on every push).
 
 name: Release PSE84
 
@@ -11,7 +12,7 @@ on:
   workflow_run:
     workflows: ["Package, test and upload core"]
     types: [completed]
-    branches: [main]
+    branches: ['**']
 
 jobs:
 
@@ -23,6 +24,7 @@ jobs:
       contents: write
     outputs:
       release_tag: ${{ steps.release_tag.outputs.release_tag }}
+      is_prerelease: ${{ steps.release_tag.outputs.is_prerelease }}
     steps:
 
       - uses: actions/checkout@v6
@@ -37,10 +39,24 @@ jobs:
         run: |
           git fetch --tags
 
+          BRANCH="${{ github.event.workflow_run.head_branch }}"
+
+          # Non-main branches get a branch-scoped pre-release tag
+          if [ "${BRANCH}" != "main" ]; then
+            BRANCH_SLUG=$(echo "${BRANCH}" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed 's/^-//;s/-$//')
+            NEW_TAG="dev-${BRANCH_SLUG}"
+            echo "Pre-release tag for branch '${BRANCH}': ${NEW_TAG}"
+            echo "release_tag=${NEW_TAG}" >> "$GITHUB_OUTPUT"
+            echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Main branch: reuse an existing semver tag on HEAD if present
           EXISTING_TAG=$(git tag --points-at "${{ github.event.workflow_run.head_sha }}" --list '[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n1)
           if [ -n "${EXISTING_TAG}" ]; then
             echo "Using existing tag on HEAD: ${EXISTING_TAG}"
             echo "release_tag=${EXISTING_TAG}" >> "$GITHUB_OUTPUT"
+            echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -67,19 +83,31 @@ jobs:
 
           NEW_TAG="${MAJOR}.${MINOR}.${PATCH}"
           echo "release_tag=${NEW_TAG}" >> "$GITHUB_OUTPUT"
+          echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
 
       - name: Create release (and tag if missing)
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.release_tag.outputs.release_tag }}
+          IS_PRERELEASE: ${{ steps.release_tag.outputs.is_prerelease }}
         run: |
-          if gh release view "${TAG}" >/dev/null 2>&1; then
-            echo "Release ${TAG} already exists"
-          else
+          if [ "${IS_PRERELEASE}" = "true" ]; then
+            # Pre-release: always overwrite so the tag tracks the branch HEAD
+            gh release delete "${TAG}" --yes --cleanup-tag 2>/dev/null || true
             gh release create "${TAG}" \
               --target "${{ github.event.workflow_run.head_sha }}" \
-              --title "ArduinoCore-zephyr-pse84 ${TAG}" \
-              --notes "Automated release for ${{ github.event.workflow_run.head_sha }}."
+              --title "ArduinoCore-zephyr-pse84 ${TAG} (pre-release)" \
+              --notes "Pre-release build from branch: ${{ github.event.workflow_run.head_branch }} @ ${{ github.event.workflow_run.head_sha }}" \
+              --prerelease
+          else
+            if gh release view "${TAG}" >/dev/null 2>&1; then
+              echo "Release ${TAG} already exists"
+            else
+              gh release create "${TAG}" \
+                --target "${{ github.event.workflow_run.head_sha }}" \
+                --title "ArduinoCore-zephyr-pse84 ${TAG}" \
+                --notes "Automated release for ${{ github.event.workflow_run.head_sha }}."
+            fi
           fi
 
 
@@ -166,6 +194,7 @@ jobs:
           tag_name: ${{ env.TAG }}
           name: ArduinoCore-zephyr-pse84 ${{ env.TAG }}
           overwrite_files: true
+          prerelease: ${{ needs.bump-version-and-tag.outputs.is_prerelease == 'true' }}
           files: |
             release-assets/${{ env.TAR_BASENAME }}
             release-assets/package_infineon_pse84_index.json
